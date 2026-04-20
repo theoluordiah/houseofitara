@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ítara Waitlist Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Josefin+Sans:wght@100;200;300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #f5ede0;
+    --green: #1a3d28;
+    --gold: #c9a96e;
+    --text-muted: rgba(245,237,224,0.55);
+    --text-dim: rgba(245,237,224,0.3);
+    --surface: rgba(255,255,255,0.06);
+    --surface-strong: rgba(255,255,255,0.14);
+  }
+  html, body { min-height: 100%; }
+  body {
+    font-family: 'Josefin Sans', sans-serif;
+    background: var(--green);
+    color: var(--cream);
+    padding: 24px;
+  }
+  a { color: var(--gold); text-decoration: none; }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .brand-mark {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 48px;
+    letter-spacing: 0.1em;
+  }
+  .brand-copy {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-size: 10px;
+    color: var(--gold);
+  }
+  .panel {
+    background: rgba(20, 45, 28, 0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(28px, 4vw, 36px);
+    margin-bottom: 10px;
+  }
+  .section-subtitle {
+    margin-bottom: 24px;
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+  }
+  .field {
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 14px 18px;
+    color: var(--cream);
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .field input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--cream);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+  }
+  .actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .btn {
+    border: none;
+    padding: 14px 20px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.16);
+    color: var(--cream);
+  }
+  .notice {
+    margin-bottom: 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+  .status {
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+  }
+  thead th {
+    text-align: left;
+    padding: 12px 14px;
+    color: var(--gold);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  tbody td {
+    padding: 14px 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 13px;
+    color: var(--cream);
+  }
+  tbody tr:hover { background: rgba(255,255,255,0.04); }
+  .empty-state {
+    padding: 28px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 18px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">
+    <div class="brand-mark">House of Ítara</div>
+    <div>
+      <!-- <div class="brand-copy">Ítara waitlist admin</div> -->
+      <!-- <div class="brand-copy" style="opacity:0.65;">Review signups and view the waitlist</div> -->
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">Waitlist Admin</div>
+    <div class="section-subtitle">Secure access for review only</div>
+
+    <div class="notice">
+      This admin page reads waitlist entries from Supabase when configured. If Supabase is not available, it will show the local browser fallback list stored on the current machine.
+    </div>
+
+    <div class="status" id="statusMessage">Locked</div>
+
+    <div class="field">
+      <input id="adminKey" type="password" placeholder="Enter admin passcode">
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="unlockAdmin()">Unlock</button>
+      <button class="btn btn-secondary" onclick="loadAdminWaitlist()">Refresh</button>
+      <a class="btn btn-secondary" href="index.html">Back to launch</a>
+    </div>
+
+    <div id="adminContent" style="display:none;">
+      <div class="notice" id="adminInfo">Loading entries…</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Joined</th></tr>
+          </thead>
+          <tbody id="waitlistRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+  const SUPABASE_URL = 'https://blosivrbfhfnlmkwijjk.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsb3NpdnJiZmhmbmxta3dpamprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NTU2MDIsImV4cCI6MjA5MjIzMTYwMn0.h51wAfYujZbWTfXqOsR8NPIYhqK7TpCo2ilsMLLKn5c';
+  const IS_SUPABASE_CONFIGURED = SUPABASE_URL && SUPABASE_ANON_KEY &&
+    !SUPABASE_URL.includes('your-project') && !SUPABASE_ANON_KEY.includes('public-anon-key');
+  const supabaseClient = IS_SUPABASE_CONFIGURED && window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+  const LOCAL_WAITLIST_KEY = 'itara_waitlist';
+  const ADMIN_SECRET = 'itara-admin';
+
+  function setStatus(message) {
+    document.getElementById('statusMessage').textContent = message;
+  }
+
+  function getLocalList() {
+    return JSON.parse(localStorage.getItem(LOCAL_WAITLIST_KEY) || '[]');
+  }
+
+  async function fetchSupabaseEntries() {
+    if (!supabaseClient) return null;
+    const { data, error } = await supabaseClient
+      .from('waitlist')
+      .select('name, email, created_at')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('Supabase fetch error', error);
+      return null;
+    }
+    return data;
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    }).format(date);
+  }
+
+  function renderList(entries) {
+    const rows = document.getElementById('waitlistRows');
+    rows.innerHTML = '';
+    if (!entries || !entries.length) {
+      document.getElementById('adminInfo').textContent = 'No waitlist entries found yet.';
+      return;
+    }
+    document.getElementById('adminInfo').textContent = `${entries.length} entries loaded.`;
+    entries.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.name || '—'}</td>
+        <td>${item.email}</td>
+        <td>${formatDate(item.created_at || item.date)}</td>
+      `;
+      rows.appendChild(tr);
+    });
+  }
+
+  async function loadAdminWaitlist() {
+    if (document.getElementById('adminContent').style.display !== 'block') return;
+    setStatus('Loading waitlist…');
+    let entries = null;
+    if (supabaseClient) {
+      entries = await fetchSupabaseEntries();
+      if (entries) {
+        setStatus('Supabase waitlist loaded.');
+      } else {
+        setStatus('Unable to load Supabase. Showing local fallback.');
+      }
+    }
+    if (!entries) {
+      entries = getLocalList();
+      if (entries.length) {
+        setStatus('Local fallback waitlist loaded.');
+      } else {
+        setStatus('Local fallback empty.');
+      }
+    }
+    renderList(entries);
+  }
+
+  function unlockAdmin() {
+    const key = document.getElementById('adminKey').value.trim();
+    if (key !== ADMIN_SECRET) {
+      setStatus('Access denied – invalid passcode.');
+      return;
+    }
+    document.getElementById('adminContent').style.display = 'block';
+    setStatus('Admin unlocked.');
+    loadAdminWaitlist();
+  }
+</script>
+</body>
+</html>

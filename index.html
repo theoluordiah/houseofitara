@@ -370,6 +370,16 @@
 
   .footer-line { width: 28px; height: 1px; background: var(--gold); opacity: 0.25; }
   .footer-text { font-size: 9px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--text-dim); }
+  .footer-link {
+    color: var(--text-muted);
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    text-decoration: none;
+    margin-left: 12px;
+    transition: color 0.2s;
+  }
+  .footer-link:hover { color: var(--cream); }
 
   /* Animation */
   @keyframes riseIn {
@@ -456,14 +466,83 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-  let count = 63;
-  document.getElementById('countDisplay').textContent = count;
+  const SUPABASE_URL = 'https://your-project.supabase.co';
+  const SUPABASE_ANON_KEY = 'your-public-anon-key';
+  const IS_SUPABASE_CONFIGURED = SUPABASE_URL && SUPABASE_ANON_KEY &&
+    !SUPABASE_URL.includes('your-project') && !SUPABASE_ANON_KEY.includes('public-anon-key');
+  const supabaseClient = IS_SUPABASE_CONFIGURED && window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
-  function handleSubmit() {
-    const name  = document.getElementById('nameInput').value.trim();
+  const LOCAL_WAITLIST_KEY = 'itara_waitlist';
+  const BASE_COUNT = 0
+  let count = BASE_COUNT;
+  let remoteCount = null;
+
+  function getLocalList() {
+    return JSON.parse(localStorage.getItem(LOCAL_WAITLIST_KEY) || '[]');
+  }
+
+  function saveLocalList(list) {
+    localStorage.setItem(LOCAL_WAITLIST_KEY, JSON.stringify(list));
+  }
+
+  async function fetchSupabaseCount() {
+    if (!supabaseClient) return null;
+    const { count, error } = await supabaseClient
+      .from('waitlist')
+      .select('id', { count: 'exact', head: true });
+    if (error) {
+      console.warn('Supabase count fetch failed', error);
+      return null;
+    }
+    return count;
+  }
+
+  async function addWaitlistEntry(entry) {
+    const localList = getLocalList();
+    if (localList.some(item => item.email.toLowerCase() === entry.email.toLowerCase())) {
+      return { added: false, list: localList };
+    }
+
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from('waitlist').insert({
+        name: entry.name,
+        email: entry.email
+      });
+      if (!error) {
+        if (remoteCount !== null) remoteCount += 1;
+        return { added: true, list: localList };
+      }
+      console.warn('Supabase insert failed, using local fallback.', error);
+    }
+
+    const updated = [...localList, entry];
+    saveLocalList(updated);
+    return { added: true, list: updated };
+  }
+
+  async function initCount() {
+    const localCount = getLocalList().length;
+    if (!supabaseClient) {
+      count = BASE_COUNT + localCount;
+      document.getElementById('countDisplay').textContent = count;
+      return;
+    }
+
+    remoteCount = await fetchSupabaseCount();
+    count = remoteCount === null
+      ? BASE_COUNT + localCount
+      : Math.max(BASE_COUNT, remoteCount) + localCount;
+    document.getElementById('countDisplay').textContent = count;
+  }
+
+  async function handleSubmit() {
+    const name = document.getElementById('nameInput').value.trim();
     const email = document.getElementById('emailInput').value.trim();
-    const err   = document.getElementById('errorMsg');
+    const err = document.getElementById('errorMsg');
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       err.style.display = 'block';
@@ -471,11 +550,13 @@
     }
     err.style.display = 'none';
 
-    const list = JSON.parse(localStorage.getItem('itara_waitlist') || '[]');
-    if (!list.find(e => e.email === email)) {
-      list.push({ name, email, date: new Date().toISOString() });
-      localStorage.setItem('itara_waitlist', JSON.stringify(list));
-      count++;
+    const result = await addWaitlistEntry({ name, email, date: new Date().toISOString() });
+    const localCount = getLocalList().length;
+
+    if (result.added) {
+      count = remoteCount === null
+        ? BASE_COUNT + localCount
+        : Math.max(BASE_COUNT, remoteCount) + localCount;
       document.getElementById('countDisplay').textContent = count;
     }
 
@@ -484,7 +565,14 @@
     document.getElementById('successName').textContent = name || 'sis';
   }
 
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.closest('.waitlist-section')) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  });
+
+  initCount();
 </script>
 </body>
 </html>
