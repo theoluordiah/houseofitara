@@ -119,6 +119,9 @@
   }
   .table-wrap {
     overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+    border-radius: 12px;
   }
   table {
     width: 100%;
@@ -184,7 +187,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Joined</th></tr>
+            <tr><th>#</th><th>Name</th><th>Email</th><th>Joined</th></tr>
           </thead>
           <tbody id="waitlistRows"></tbody>
         </table>
@@ -215,15 +218,21 @@
 
   async function fetchSupabaseEntries() {
     if (!supabaseClient) return null;
-    const { data, error } = await supabaseClient
-      .from('waitlist')
-      .select('name, email, created_at')
-      .order('created_at', { ascending: true });
-    if (error) {
-      console.warn('Supabase fetch error', error);
+    try {
+      const { data, error } = await supabaseClient
+        .from('waitlist')
+        .select('name, email, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10000);
+      if (error) {
+        console.warn('Supabase fetch error', error);
+        return null;
+      }
+      return data || [];
+    } catch (err) {
+      console.warn('Supabase error:', err);
       return null;
     }
-    return data;
   }
 
   function formatDate(dateString) {
@@ -241,38 +250,55 @@
       document.getElementById('adminInfo').textContent = 'No waitlist entries found yet.';
       return;
     }
-    document.getElementById('adminInfo').textContent = `${entries.length} entries loaded.`;
-    entries.forEach(item => {
+    document.getElementById('adminInfo').textContent = `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} loaded.`;
+    
+    // Sort by date descending (newest first) if using local fallback
+    if (entries[0] && entries[0].date && !entries[0].created_at) {
+      entries = entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+    
+    entries.forEach((item, index) => {
       const tr = document.createElement('tr');
+      const dateField = item.created_at || item.date;
       tr.innerHTML = `
+        <td>${index + 1}</td>
         <td>${item.name || '—'}</td>
-        <td>${item.email}</td>
-        <td>${formatDate(item.created_at || item.date)}</td>
+        <td>${item.email || '—'}</td>
+        <td>${formatDate(dateField)}</td>
       `;
       rows.appendChild(tr);
     });
   }
 
   async function loadAdminWaitlist() {
-    if (document.getElementById('adminContent').style.display !== 'block') return;
     setStatus('Loading waitlist…');
     let entries = null;
+    
+    console.log('Supabase client available:', !!supabaseClient);
+    
     if (supabaseClient) {
       entries = await fetchSupabaseEntries();
-      if (entries) {
-        setStatus('Supabase waitlist loaded.');
+      console.log('Supabase entries:', entries);
+      if (entries && entries.length > 0) {
+        setStatus(`Supabase loaded: ${entries.length} entries.`);
       } else {
-        setStatus('Unable to load Supabase. Showing local fallback.');
+        setStatus('Supabase empty or unavailable. Trying local fallback...');
       }
+    } else {
+      console.warn('Supabase client not initialized');
+      setStatus('Supabase not configured. Using local fallback.');
     }
-    if (!entries) {
+    
+    if (!entries || entries.length === 0) {
       entries = getLocalList();
-      if (entries.length) {
-        setStatus('Local fallback waitlist loaded.');
+      console.log('Local fallback entries:', entries);
+      if (entries.length > 0) {
+        setStatus(`Local fallback loaded: ${entries.length} entries.`);
       } else {
-        setStatus('Local fallback empty.');
+        setStatus('No entries found anywhere.');
       }
     }
+    
     renderList(entries);
   }
 
@@ -283,9 +309,19 @@
       return;
     }
     document.getElementById('adminContent').style.display = 'block';
-    setStatus('Admin unlocked.');
+    setStatus('Admin unlocked. Loading waitlist…');
     loadAdminWaitlist();
   }
+
+  // Initialize and log status
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('==== Ítara Admin Initialized ====');
+    console.log('Supabase URL:', SUPABASE_URL ? '✓ Configured' : '✗ Missing');
+    console.log('Supabase Key:', SUPABASE_ANON_KEY ? '✓ Configured' : '✗ Missing');
+    console.log('Is Supabase Configured:', IS_SUPABASE_CONFIGURED);
+    console.log('Supabase Client:', supabaseClient ? '✓ Ready' : '✗ Not initialized');
+    console.log('Local storage fallback:', getLocalList().length, 'entries');
+  });
 </script>
 </body>
 </html>
