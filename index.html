@@ -476,18 +476,9 @@
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-  const LOCAL_WAITLIST_KEY = 'itara_waitlist';
   const BASE_COUNT = 0
   let count = BASE_COUNT;
   let remoteCount = null;
-
-  function getLocalList() {
-    return JSON.parse(localStorage.getItem(LOCAL_WAITLIST_KEY) || '[]');
-  }
-
-  function saveLocalList(list) {
-    localStorage.setItem(LOCAL_WAITLIST_KEY, JSON.stringify(list));
-  }
 
   async function fetchSupabaseCount() {
     if (!supabaseClient) return null;
@@ -502,67 +493,65 @@
   }
 
   async function addWaitlistEntry(entry) {
-    const localList = getLocalList();
-    if (localList.some(item => item.email.toLowerCase() === entry.email.toLowerCase())) {
-      return { added: false, list: localList };
+    if (!supabaseClient) {
+      console.error('Supabase not configured');
+      return { added: false };
     }
 
-    if (supabaseClient) {
-      const { error } = await supabaseClient.from('waitlist').insert({
-        name: entry.name,
-        email: entry.email
-      });
-      if (!error) {
-        if (remoteCount !== null) remoteCount += 1;
-        return { added: true, list: localList };
-      }
-      console.warn('Supabase insert failed, using local fallback.', error);
+    const { error } = await supabaseClient.from('waitlist').insert({
+      name: entry.name,
+      email: entry.email
+    });
+    
+    if (error) {
+      console.error('Supabase insert error:', error);
+      return { added: false };
     }
-
-    const updated = [...localList, entry];
-    saveLocalList(updated);
-    return { added: true, list: updated };
+    
+    if (remoteCount !== null) remoteCount += 1;
+    return { added: true };
   }
 
   async function initCount() {
-    const localCount = getLocalList().length;
     if (!supabaseClient) {
-      count = BASE_COUNT + localCount;
+      count = BASE_COUNT;
       document.getElementById('countDisplay').textContent = count;
       return;
     }
 
     remoteCount = await fetchSupabaseCount();
-    count = remoteCount === null
-      ? BASE_COUNT + localCount
-      : Math.max(BASE_COUNT, remoteCount) + localCount;
+    count = remoteCount === null ? BASE_COUNT : Math.max(BASE_COUNT, remoteCount);
     document.getElementById('countDisplay').textContent = count;
   }
 
   async function handleSubmit() {
     const name = document.getElementById('nameInput').value.trim();
     const email = document.getElementById('emailInput').value.trim();
-    const err = document.getElementById('errorMsg');
+    const error = document.getElementById('errorMsg');
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      err.style.display = 'block';
+      error.textContent = 'Please enter a valid email address.';
+      error.style.display = 'block';
       return;
     }
-    err.style.display = 'none';
+    error.style.display = 'none';
 
-    const result = await addWaitlistEntry({ name, email, date: new Date().toISOString() });
-    const localCount = getLocalList().length;
+    document.querySelector('.btn').textContent = 'Joining...';
+    
+    const result = await addWaitlistEntry({ name, email });
 
     if (result.added) {
-      count = remoteCount === null
-        ? BASE_COUNT + localCount
-        : Math.max(BASE_COUNT, remoteCount) + localCount;
+      if (remoteCount !== null) remoteCount += 1;
+      count = Math.max(BASE_COUNT, remoteCount);
       document.getElementById('countDisplay').textContent = count;
+      document.getElementById('formWrap').style.display = 'none';
+      document.getElementById('successBox').style.display = 'block';
+      document.getElementById('successName').textContent = name || 'sis';
+    } else {
+      error.textContent = 'Something went wrong. Please try again.';
+      error.style.display = 'block';
+      document.querySelector('.btn').textContent = 'Join';
     }
-
-    document.getElementById('formWrap').style.display = 'none';
-    document.getElementById('successBox').style.display = 'block';
-    document.getElementById('successName').textContent = name || 'sis';
   }
 
   document.addEventListener('keydown', e => {

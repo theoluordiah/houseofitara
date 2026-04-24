@@ -167,7 +167,7 @@
     <div class="section-subtitle">Secure access for review only</div>
 
     <div class="notice">
-      This admin page reads waitlist entries from Supabase when configured. If Supabase is not available, it will show the local browser fallback list stored on the current machine.
+      This admin page reads waitlist entries from Supabase. Contact support if data is not loading.
     </div>
 
     <div class="status" id="statusMessage">Locked</div>
@@ -205,33 +205,33 @@
   const supabaseClient = IS_SUPABASE_CONFIGURED && window.supabase
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
-  const LOCAL_WAITLIST_KEY = 'itara_waitlist';
   const ADMIN_SECRET = 'itara-admin';
 
   function setStatus(message) {
     document.getElementById('statusMessage').textContent = message;
   }
 
-  function getLocalList() {
-    return JSON.parse(localStorage.getItem(LOCAL_WAITLIST_KEY) || '[]');
-  }
-
   async function fetchSupabaseEntries() {
-    if (!supabaseClient) return null;
+    if (!supabaseClient) {
+      console.error('Supabase client is null');
+      return { error: 'Supabase not configured', data: null };
+    }
     try {
       const { data, error } = await supabaseClient
         .from('waitlist')
         .select('name, email, created_at')
         .order('created_at', { ascending: false })
         .limit(10000);
+      
       if (error) {
-        console.warn('Supabase fetch error', error);
-        return null;
+        console.error('Supabase fetch error:', error.message);
+        return { error: error.message, data: null };
       }
-      return data || [];
+      
+      return { error: null, data: data || [] };
     } catch (err) {
-      console.warn('Supabase error:', err);
-      return null;
+      console.error('Supabase exception:', err.message);
+      return { error: err.message, data: null };
     }
   }
 
@@ -252,54 +252,42 @@
     }
     document.getElementById('adminInfo').textContent = `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} loaded.`;
     
-    // Sort by date descending (newest first) if using local fallback
-    if (entries[0] && entries[0].date && !entries[0].created_at) {
-      entries = entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-    
     entries.forEach((item, index) => {
       const tr = document.createElement('tr');
-      const dateField = item.created_at || item.date;
       tr.innerHTML = `
         <td>${index + 1}</td>
         <td>${item.name || '—'}</td>
         <td>${item.email || '—'}</td>
-        <td>${formatDate(dateField)}</td>
+        <td>${formatDate(item.created_at)}</td>
       `;
       rows.appendChild(tr);
     });
   }
 
   async function loadAdminWaitlist() {
-    setStatus('Loading waitlist…');
-    let entries = null;
+    setStatus('Loading from Supabase...');
     
-    console.log('Supabase client available:', !!supabaseClient);
+    if (!supabaseClient) {
+      setStatus('Supabase not configured.');
+      renderList([]);
+      return;
+    }
     
-    if (supabaseClient) {
-      entries = await fetchSupabaseEntries();
-      console.log('Supabase entries:', entries);
-      if (entries && entries.length > 0) {
-        setStatus(`Supabase loaded: ${entries.length} entries.`);
-      } else {
-        setStatus('Supabase empty or unavailable. Trying local fallback...');
-      }
+    const result = await fetchSupabaseEntries();
+    
+    if (result.error) {
+      setStatus(`Error: ${result.error}`);
+      renderList([]);
+      return;
+    }
+    
+    if (result.data && result.data.length > 0) {
+      setStatus(`Loaded: ${result.data.length} ${result.data.length === 1 ? 'entry' : 'entries'}`);
     } else {
-      console.warn('Supabase client not initialized');
-      setStatus('Supabase not configured. Using local fallback.');
+      setStatus('No entries found.');
     }
     
-    if (!entries || entries.length === 0) {
-      entries = getLocalList();
-      console.log('Local fallback entries:', entries);
-      if (entries.length > 0) {
-        setStatus(`Local fallback loaded: ${entries.length} entries.`);
-      } else {
-        setStatus('No entries found anywhere.');
-      }
-    }
-    
-    renderList(entries);
+    renderList(result.data || []);
   }
 
   function unlockAdmin() {
@@ -320,7 +308,6 @@
     console.log('Supabase Key:', SUPABASE_ANON_KEY ? '✓ Configured' : '✗ Missing');
     console.log('Is Supabase Configured:', IS_SUPABASE_CONFIGURED);
     console.log('Supabase Client:', supabaseClient ? '✓ Ready' : '✗ Not initialized');
-    console.log('Local storage fallback:', getLocalList().length, 'entries');
   });
 </script>
 </body>
