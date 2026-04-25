@@ -179,6 +179,7 @@
     <div class="actions">
       <button class="btn" onclick="unlockAdmin()">Unlock</button>
       <button class="btn btn-secondary" onclick="loadAdminWaitlist()">Refresh</button>
+      <button class="btn btn-secondary" id="exportBtn" onclick="exportToSpreadsheet()" style="display:none;">Export as CSV</button>
       <a class="btn btn-secondary" href="index.html">Back to launch</a>
     </div>
 
@@ -297,8 +298,33 @@
       return;
     }
     document.getElementById('adminContent').style.display = 'block';
+    document.getElementById('exportBtn').style.display = 'inline-block';
     setStatus('Admin unlocked. Loading waitlist…');
     loadAdminWaitlist();
+  }
+
+  function exportToSpreadsheet() {
+    const rows = document.querySelectorAll('#waitlistRows tr');
+    if (rows.length === 0) {
+      setStatus('No data to export.');
+      return;
+    }
+    
+    let csv = 'Name,Email,Joined\n';
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      const name = cells[1]?.textContent?.trim() || '';
+      const email = cells[2]?.textContent?.trim() || '';
+      const joined = cells[3]?.textContent?.trim() || '';
+      csv += `"${name}","${email}","${joined}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `itara-waitlist-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    setStatus('CSV exported successfully.');
   }
 
   // Initialize and log status
