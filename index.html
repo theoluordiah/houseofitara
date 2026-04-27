@@ -253,6 +253,7 @@
     background: rgba(255,255,255,0.04);
     margin-bottom: 8px;
     transition: border-color 0.3s;
+    display: none;
   }
 
   .field:focus-within { border-color: var(--gold); }
@@ -273,7 +274,7 @@
   .field input::placeholder { color: rgba(245,237,224,0.3); }
 
   .submit-row {
-    display: flex;
+    display: none;
     border: 1px solid rgba(255,255,255,0.15);
     background: rgba(255,255,255,0.04);
     margin-bottom: 8px;
@@ -315,7 +316,13 @@
   .btn:hover { background: #ddbf85; }
   .btn:active { transform: scale(0.97); }
 
-  .error { font-size: 10px; letter-spacing: 0.15em; color: #e08888; margin-top: 8px; display: none; }
+  .error { 
+    font-size: 10px; 
+    letter-spacing: 0.15em; 
+    color: #e08888; 
+    margin-top: 8px; 
+    display: none; 
+  }
 
   /* Success */
   .success {
@@ -350,6 +357,7 @@
     letter-spacing: 0.25em;
     text-transform: uppercase;
     color: var(--text-dim);
+    display: none;
   }
   .counter b { color: var(--gold); font-weight: 300; }
 
@@ -434,24 +442,7 @@
 
     <div class="waitlist-section">
       <div class="waitlist-heading">Be the first to know — join the waitlist</div>
-
-      <div id="formWrap">
-        <div class="field">
-          <input type="text" id="nameInput" placeholder="Your name" autocomplete="off">
-        </div>
-        <div class="submit-row">
-          <input type="email" id="emailInput" placeholder="Your email address" autocomplete="off">
-          <button class="btn" onclick="handleSubmit()">Join</button>
-        </div>
-        <div class="error" id="errorMsg">Please enter a valid email address.</div>
-      </div>
-
-      <div class="success" id="successBox">
-        <div class="success-top">You're on the list ✦</div>
-        <div class="success-msg">We'll make sure your curls<br>are the first to last, <span id="successName"></span>.</div>
-      </div>
-
-      <div class="counter"><b id="countDisplay">—</b> girls already waiting</div>
+      <a href="https://forms.gle/j136bY9gAJFunPwx9" target="_blank" class="btn" style="display: inline-block; text-decoration: none;">Join</a>
     </div>
 
   </main>
@@ -466,102 +457,8 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-  const SUPABASE_URL = 'https://blosivrbfhfnlmkwijjk.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsb3NpdnJiZmhmbmxta3dpamprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NTU2MDIsImV4cCI6MjA5MjIzMTYwMn0.h51wAfYujZbWTfXqOsR8NPIYhqK7TpCo2ilsMLLKn5c';
-  const IS_SUPABASE_CONFIGURED = SUPABASE_URL && SUPABASE_ANON_KEY &&
-    !SUPABASE_URL.includes('your-project') && !SUPABASE_ANON_KEY.includes('public-anon-key');
-  const supabaseClient = IS_SUPABASE_CONFIGURED && window.supabase
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
-  const BASE_COUNT = 0
-  let count = BASE_COUNT;
-  let remoteCount = null;
-
-  async function fetchSupabaseCount() {
-    if (!supabaseClient) return null;
-    const { count, error } = await supabaseClient
-      .from('waitlist')
-      .select('id', { count: 'exact', head: true });
-    if (error) {
-      console.warn('Supabase count fetch failed', error);
-      return null;
-    }
-    return count;
-  }
-
-  async function addWaitlistEntry(entry) {
-    if (!supabaseClient) {
-      console.error('Supabase not configured');
-      return { added: false };
-    }
-
-    const { error } = await supabaseClient.from('waitlist').insert({
-      name: entry.name,
-      email: entry.email
-    });
-    
-    if (error) {
-      console.error('Supabase insert error:', error);
-      return { added: false };
-    }
-    
-    if (remoteCount !== null) remoteCount += 1;
-    return { added: true };
-  }
-
-  async function initCount() {
-    if (!supabaseClient) {
-      count = BASE_COUNT;
-      document.getElementById('countDisplay').textContent = count;
-      return;
-    }
-
-    remoteCount = await fetchSupabaseCount();
-    count = remoteCount === null ? BASE_COUNT : Math.max(BASE_COUNT, remoteCount);
-    document.getElementById('countDisplay').textContent = count;
-  }
-
-  async function handleSubmit() {
-    const name = document.getElementById('nameInput').value.trim();
-    const email = document.getElementById('emailInput').value.trim();
-    const error = document.getElementById('errorMsg');
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      error.textContent = 'Please enter a valid email address.';
-      error.style.display = 'block';
-      return;
-    }
-    error.style.display = 'none';
-
-    document.querySelector('.btn').textContent = 'Joining...';
-    
-    const result = await addWaitlistEntry({ name, email });
-
-    if (result.added) {
-      if (remoteCount !== null) remoteCount += 1;
-      count = Math.max(BASE_COUNT, remoteCount);
-      document.getElementById('countDisplay').textContent = count;
-      document.getElementById('formWrap').style.display = 'none';
-      document.getElementById('successBox').style.display = 'block';
-      document.getElementById('successName').textContent = name || 'sis';
-    } else {
-      error.textContent = 'Something went wrong. Please try again.';
-      error.style.display = 'block';
-      document.querySelector('.btn').textContent = 'Join';
-    }
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.activeElement.closest('.waitlist-section')) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  });
-
-  initCount();
+  // No form handling needed - button links directly to Google Form
 </script>
 </body>
 </html>
